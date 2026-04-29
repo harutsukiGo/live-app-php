@@ -10,9 +10,9 @@ require_once("includes/functions.php");
 //session_start();
 global $mysqli;
 $idEpreuve = $_GET['idEpreuve'];
-$idLecteur = $_GET['idLecteur'];
-$infos_lieux = getInfosParcoursLieu($idEpreuve, $idLecteur);
-$lieu = $infos_lieux['lieu'];
+// $idLecteur = $_GET['idLecteur'];
+$infos_epreuve = getInfosEpreuve($idEpreuve);
+$lieu = $infos_epreuve['ville'];
 $admin = 0;
 //if ($_SESSION["typeInternaute"] == 'admin' || $_SESSION["typeInternaute"] == 'super_organisateur') {
 //    $admin = 1;
@@ -90,30 +90,28 @@ if (isset($_POST['ajout_heure']) and $_POST['ajout_heure'] != '' && $_POST['ajou
     $stmt->execute();
     $result = $stmt->get_result();
 }
-function getClassementLieu($idEpreuve, $idLecteur)
+function getClassementLieu($idEpreuve)
 {
     global $mysqli;
-    $query = 'SELECT iei.idInscriptionEpreuveInternaute, iei.idInternaute, iei.idEpreuveParcours, iei.dossard, iei.categorie, iei.equipe, horaire AS horaire,
-    ri.nomInternaute, ri.prenomInternaute, ri.sexeInternaute, ri.clubInternaute, ri.villeInternaute, ri.paysInternaute,
-    ep.nomParcours, ep.idEpreuveParcours, ep.horaireDepart, liv.id, liv.idInscription, liv.passage 
-    FROM r_inscriptionepreuveinternaute iei
-    INNER JOIN r_internaute ri ON iei.idInternaute = ri.idInternaute
-    INNER JOIN live_Horaire liv ON liv.idInscription= iei.idInscriptionEpreuveInternaute
-    INNER JOIN live_Lecteur cl ON liv.idLecteur = cl.idLecteur
-    INNER JOIN r_epreuveparcours ep ON iei.idEpreuveParcours = ep.idEpreuveParcours
-    WHERE liv.idLecteur = ?
-    AND ep.idEpreuve = ? 
-    AND cl.idEpreuve = ? 
-    AND liv.passage <= cl.nb_passage
-    -- AND ep.horaireDepart < liv.horaire
-    AND cl.date_min < liv.horaire
-    AND cl.date_max > liv.horaire
-    ORDER BY liv.passage DESC, liv.horaire ASC';
-    // echo $query;
-    // exit();
+    $query = 'SELECT iei.idInscriptionEpreuveInternaute, iei.idInternaute, iei.idEpreuveParcours, iei.dossard, iei.categorie, iei.equipe,
+  MAX(liv.horaire) AS horaire,
+  ri.nomInternaute, ri.prenomInternaute, ri.sexeInternaute, ri.clubInternaute, ri.villeInternaute, ri.paysInternaute,
+  ep.nomParcours, ep.idEpreuveParcours, ep.horaireDepart, MAX(liv.id) AS id, liv.idInscription, MAX(liv.passage) AS passage
+  FROM live_Horaire liv
+  INNER JOIN r_inscriptionepreuveinternaute iei ON liv.idInscription = iei.idInscriptionEpreuveInternaute
+  INNER JOIN r_internaute ri ON iei.idInternaute = ri.idInternaute
+  INNER JOIN live_reader cl ON cl.lieu = liv.lieu AND cl.idParcours = iei.idEpreuveParcours
+  INNER JOIN r_epreuveparcours ep ON iei.idEpreuveParcours = ep.idEpreuveParcours
+  WHERE liv.idEpreuve = ?
+  AND cl.date_min < liv.horaire
+  AND cl.date_max > liv.horaire
+  GROUP BY liv.idInscription
+  ORDER BY horaire ASC';
+//    echo $query;
+//    exit();
 
     $stmt = $mysqli->prepare($query);
-    $stmt->bind_param("iii", $idLecteur, $idEpreuve, $idEpreuve);
+    $stmt->bind_param("i", $idEpreuve);
     $stmt->execute();
     $result = $stmt->get_result();
     $classement = mysqli_fetch_all($result, MYSQLI_ASSOC);
@@ -121,7 +119,7 @@ function getClassementLieu($idEpreuve, $idLecteur)
     return $classement;
 }
 
-$classement = getClassementLieu($idEpreuve, $idLecteur);
+$classement = getClassementLieu($idEpreuve);
 
 function getflag($pays)
 {
@@ -154,6 +152,8 @@ function getInfosParcoursLieu($idEpreuve, $idLecteur)
     JOIN live_Lecteur cl ON ep.idEpreuve = cl.idEpreuve
     WHERE cl.idEpreuve = ?
     AND idLecteur = ? ';
+    echo $query ;
+    exit();
 
     $stmt = $mysqli->prepare($query);
     $stmt->bind_param("ii", $idEpreuve, $idLecteur);
@@ -164,9 +164,44 @@ function getInfosParcoursLieu($idEpreuve, $idLecteur)
     return $infos_lieux;
 }
 
-function getParcours($idEpreuve, $idLecteur)
+function getInfosEpreuve($idEpreuve)
 {
     global $mysqli;
+
+    $query = 'SELECT  nomEpreuve, dateEpreuve, ville
+    FROM r_epreuve ep
+    WHERE ep.idEpreuve = ?';
+    // echo $query ;
+    // exit();
+
+    $stmt = $mysqli->prepare($query);
+    $stmt->bind_param("i", $idEpreuve);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $infos_epreuve = mysqli_fetch_assoc($result);
+
+    return $infos_epreuve;
+}
+
+function getParcours($idEpreuve)
+{
+    global $mysqli;
+
+    // $query = 'SELECT DISTINCT ep.nomParcours, ep.idEpreuveParcours
+    // FROM r_epreuveparcours ep
+    // JOIN live_Lecteur cl ON ep.idEpreuve = cl.idEpreuve
+    // JOIN live_Horaire liv ON ep.idEpreuveParcours = (
+    //     SELECT idEpreuveParcours
+    //     FROM r_inscriptionepreuveinternaute
+    //     WHERE idInscriptionEpreuveInternaute = liv.idInscription
+    // )
+    // WHERE cl.idEpreuve = ?
+    // AND cl.idLecteur = ?
+    // AND liv.idLecteur = ?
+    // AND ep.nomParcours <> "Repas"
+    // AND liv.passage <= cl.nb_passage
+    // AND cl.date_min < liv.horaire
+    // AND cl.date_max > liv.horaire';
 
     $query = 'SELECT DISTINCT ep.nomParcours, ep.idEpreuveParcours
     FROM r_epreuveparcours ep
@@ -177,15 +212,14 @@ function getParcours($idEpreuve, $idLecteur)
         WHERE idInscriptionEpreuveInternaute = liv.idInscription
     )
     WHERE cl.idEpreuve = ?
-    AND cl.idLecteur = ?
-    AND liv.idLecteur = ?
-    AND ep.nomParcours <> "Repas"
     AND liv.passage <= cl.nb_passage
     AND cl.date_min < liv.horaire
     AND cl.date_max > liv.horaire';
+    // echo $query;
+    // exit();
 
     $stmt = $mysqli->prepare($query);
-    $stmt->bind_param("iii", $idEpreuve, $idLecteur, $idLecteur);
+    $stmt->bind_param("i", $idEpreuve);
     $stmt->execute();
     $result = $stmt->get_result();
     $parcours = mysqli_fetch_all($result, MYSQLI_ASSOC);
@@ -211,11 +245,14 @@ function getLecteurs($idEpreuve)
 function getLieu($idEpreuve)
 {
     global $mysqli;
-    $queryLecteurs = "SELECT lieu,distance,idParcours
+    $queryLecteurs = "SELECT lieu,distance_depart,idParcours
                   FROM live_reader
                   WHERE idEpreuve = ?
-                  ORDER BY distance";
+                  ORDER BY distance_depart";
+
     $stmt = $mysqli->prepare($queryLecteurs);
+//    echo $queryLecteurs;
+//    exit();
     $stmt->bind_param("i", $idEpreuve);
     $stmt->execute();
     $lecteurs = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -247,13 +284,13 @@ function getTempsPassageLieu($idEpreuve,$lieu){
     global $mysqli;
 
     $query = "SELECT lh.horaire,lh.idInscription
-                FROM live_Horaire lh
-                    JOIN live_reader lr ON lr.idEpreuve = lh.idEpreuve
-                        JOIN r_inscriptionepreuveinternaute iei ON iei.idInscriptionEpreuveInternaute= lh.idInscription
-                            WHERE lr.idEpreuve = ?
-                                AND lr.lieu = ?
-                                    AND lr.date_min < lh.horaire AND lr.date_max > lh.horaire
-                                        ORDER BY lh.horaire ASC;";
+     FROM live_Horaire lh JOIN r_inscriptionepreuveinternaute iei ON iei.idInscriptionEpreuveInternaute= lh.idInscription 
+     INNER JOIN live_reader lr ON (lr.lieu=lh.lieu AND iei.idEpreuveParcours= lr.idParcours) 
+     WHERE lr.idEpreuve = ? AND lr.lieu = ? AND lr.date_min < lh.horaire AND lr.date_max > lh.horaire 
+     ORDER BY lh.horaire DESC;";
+    // echo $query;
+    // exit();
+
 
     $stmt = $mysqli->prepare($query);
     $stmt->bind_param("is", $idEpreuve, $lieu);
@@ -285,7 +322,7 @@ foreach ($lieux as $lieu) {
 
 <head>
     <meta charset="utf-8"/>
-    <title>ATS-SPORT | Résultats live <?php echo $infos_lieux['lieu'] ?></title>
+    <title>ATS-SPORT | Résultats live <?php echo $getInfosEpreuve['nomEpreuve'] ?></title>
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
     <meta content="chronométrage, chronométreur, inscriptions en ligne, dossards, course à pied, trail, cyclisme, cyclosportive, vtt, triathlon, duathlon"
           name="description"/>
@@ -307,28 +344,28 @@ foreach ($lieux as $lieu) {
     <script src="../assets/plugins/jquery-ui/ui/minified/jquery-ui.min.js"></script>
     <script>
         // fonctions jQuery ajax qui appelle le script majClassementLieu pour mettre à jour le classement du lieu toutes les 5 secondes
-        $(document).ready(function () {
-            setInterval(function () {
-                majTableau();
-                majNbCoureurs();
-            }, 60000);
-            // 1000= 1 seconde, ne pas descendre sous les 5000
-        });
+        // $(document).ready(function () {
+        //     setInterval(function () {
+        //         majTableau();
+        //         majNbCoureurs();
+        //     }, 60000);
+        //     // 1000= 1 seconde, ne pas descendre sous les 5000
+        // });
 
-        function majTableau() {
-            $.ajax({
-                type: "GET",
-                url: "majClassementLieu.php",
-                data: {
-                    idLecteur: "<?php echo $idLecteur ?>",
-                    idEpreuve: "<?php echo $idEpreuve ?>",
-                    lieu: "<?php echo $lieu ?>"
-                },
-                success: function (data) {
-                    $("table").html(data);
-                }
-            });
-        }
+        // function majTableau() {
+        //     $.ajax({
+        //         type: "GET",
+        //         url: "majClassementLieu.php",
+        //         data: {
+        //             idLecteur: "<?php echo $idLecteur ?>",
+        //             idEpreuve: "<?php echo $idEpreuve ?>",
+        //             lieu: "<?php echo $lieu ?>"
+        //         },
+        //         success: function (data) {
+        //             $("table").html(data);
+        //         }
+        //     });
+        // }
 
         //  fonctions jQuery ajax qui appelle le script majNbCoureurs pour mettre à jour le nombre de coureurs passés sur le lieu toutes les 5 secondes
         function majNbCoureurs() {
@@ -348,10 +385,9 @@ foreach ($lieux as $lieu) {
 </head>
 
 <body>
-<!--<script>require('../public/app.js')</script>-->
 <input type="hidden" id="<?php echo $idEpreuve ?>">
 <div id="page-container" style="background:rgb(225, 225, 225)">
-    <?php include('header.php'); ?>
+    <?php include('../header.php'); ?>
     <div style="margin-top:10px;"></div>
     <div id="resultats_complets" class="content" data-scrollview="true" style="margin-top:50px;">
         <div class="container-fluid" data-animation="true" data-animation-type="fadeInDown" style="max-width: 90%;">
@@ -359,7 +395,7 @@ foreach ($lieux as $lieu) {
             <div class="content-title" style="display : flex; flex-direction: column; justify-content : center;">
                 <div>
                     <p class="btn btn-inverse"
-                       style="background:#444444;font-weight: 500;"><?php echo $infos_lieux['nomEpreuve'] . " - " . date('d/m/Y', strtotime($infos_lieux['dateEpreuve'])) ?></br>
+                       style="background:#444444;font-weight: 500;"><?php echo $infos_epreuve['nomEpreuve'] . " - " . date('d/m/Y', strtotime($infos_epreuve['dateEpreuve'])) ?></br>
                     </p>
                 </div>
             </div>
@@ -368,14 +404,14 @@ foreach ($lieux as $lieu) {
             </div>
 
             <div class="content-title" style="display : flex; flex-direction: column; justify-content : center;">
-                <div>
+                <!-- <div>
                     <p class="btn btn-inverse" style="background:#444444;font-weight: 500;">Chronométrage Live
-                        - <?php echo "Point de passage : " . $infos_lieux['lieu'] ?></p>
+                        - <?php echo "Point de passage : " . $infos_epreuve['ville'] ?></p>
                     </p>
-                </div>
+                </div> -->
                 <div id=nb_coureurs></div>
                 <div><span style='color:#348fe2;font-size:23px;font-weight:normal;text-align:center;'><a
-                                href="liveinsport.php?idEpreuve=<?php echo $idEpreuve ?>"> Suivre + de lieux</a></span>
+                                href="liveinsport.php?idEpreuve=<?php echo $idEpreuve ?>"> Revenir à l'accueil</a></span>
                 </div>
 
                 <div class="input-group input-group-lg">
@@ -416,7 +452,7 @@ foreach ($lieux as $lieu) {
                             </div>
                         </div>
                         <input type="hidden" style="text-align: center" class="form-control ajout_lieu"
-                               name="ajout_lieu" id="ajout_lieu" value='<?php echo $infos_lieux['lieu'] ?>'>
+                               name="ajout_lieu" id="ajout_lieu" value='<?php echo $infos_epreuve['ville'] ?>'>
                         <div class="row">
 
                             <div class="col-md-5">
@@ -435,10 +471,9 @@ foreach ($lieux as $lieu) {
 
             <?php
             echo "<button type='button' class='btn btn-default' style='background:grey;color:white;font-weight: 500;margin-right:5px;margin-bottom:5px;' onclick='filtrerParParcours(0)'>Tous les parcours</button>";
-
-            foreach (getParcours($idEpreuve, $idLecteur) as $p) {
+            foreach (getParcours($idEpreuve) as $p) {
                 $color = "background:grey;color:white;font-weight: 500;margin-right:5px;margin-bottom:5px;";
-                echo "<button type='button' class='btn btn-default' style='" . $color . "' onclick=\"filtrerParParcours('" . $p['idEpreuveParcours'] . "')\">" . $p['nomParcours'] . "</button>";
+                echo "<button type='button' class='btn btn-default' data-idEpreuveParcours='" . $p['idEpreuveParcours'] . "' style='" . $color . "' onclick=\"filtrerParParcours('" . $p['idEpreuveParcours'] . "')\">" . $p['nomParcours'] . "</button>";
             }
             ?>
 
@@ -468,7 +503,8 @@ foreach ($lieux as $lieu) {
 
                                 <?php
                                 foreach (getLieu($idEpreuve) as $lieu) {
-                                    echo "<th scope='col' style='text-align: center' data-parcoursLieu='" . $lieu['idParcours'] . "'>" . $lieu['lieu'] . "<br/><small> " . $lieu['distance'] . "km</small></th>";
+                                    $indexLieu = array_search($lieu['lieu'], array_column($lieux, 'lieu'));
+                                    echo "<th scope='col' style='text-align: center' data-parcoursLieu='" . $lieu['idParcours'] . "' data-lieuIndex='" . $indexLieu . "'>" . $lieu['lieu'] . "<br/><small> " . $lieu['distance_depart'] . "km</small></th>";
                                 }
                                 ?>
 
@@ -487,30 +523,32 @@ foreach ($lieux as $lieu) {
                             $listeEpreuve = listeDeCoupleParcoursIndex($idEpreuve);
                             $tabdossard = array();
                             //On met à jour le nombre de passage par rapport au critères de la course
-                            $query2 = "SELECT id, dossard, passage FROM live_Horaire liv
-                        INNER JOIN live_Lecteur cl ON liv.idLecteur=cl.idLecteur
-                        WHERE liv.idLecteur = " . $idLecteur . " AND liv.idEpreuve=" . $idEpreuve . " AND liv.passage < cl.nb_passage AND cl.date_min < liv.horaire AND cl.date_max > liv.horaire
-                        ORDER BY dossard, horaire ";
-                            $result2 = $mysqli->query($query2) or die("Sql error : " . mysqli_error($mysqli));
+                            // $query2 = "SELECT id, dossard, passage FROM live_Horaire liv
+                            // INNER JOIN live_Lecteur cl ON liv.idLecteur=cl.idLecteur
+                            // WHERE liv.idLecteur = " . $idLecteur . " AND liv.idEpreuve=" . $idEpreuve . " AND liv.passage < cl.nb_passage AND cl.date_min < liv.horaire AND cl.date_max > liv.horaire
+                            // ORDER BY dossard, horaire ";
+                            // $result2 = $mysqli->query($query2) or die("Sql error : " . mysqli_error($mysqli));
                             $passage = 1;
                             $dossard = 0;
-                            while ($row = mysqli_fetch_assoc($result2)) {
-                                //   echo $row['dossard']."=". $dossard."</br>";
-                                if ($row['dossard'] == $dossard) {
-                                    $passage = $passage + 1;
-                                } else {
-                                    $passage = 1;
-                                    $dossard = $row['dossard'];
-                                }
-                                $query2 = "UPDATE live_Horaire SET passage = " . $passage . " WHERE id = " . $row['id'];
-                                $result2 = $mysqli->query($query2) or die("Sql error : " . mysqli_error($mysqli));
-                            }
+                            // while ($row = mysqli_fetch_assoc($result2)) {
+                            //     //   echo $row['dossard']."=". $dossard."</br>";
+                            //     if ($row['dossard'] == $dossard) {
+                            //         $passage = $passage + 1;
+                            //     } else {
+                            //         $passage = 1;
+                            //         $dossard = $row['dossard'];
+                            //     }
+                            //     $query2 = "UPDATE live_Horaire SET passage = " . $passage . " WHERE id = " . $row['id'];
+                            //     $result2 = $mysqli->query($query2) or die("Sql error : " . mysqli_error($mysqli));
+                            // }
 
 
                             foreach ($classement as $placeClassement) {
                                 //On scinde le nom du parcours
+
                                 $pparcours = explode("-", $placeClassement['nomParcours']);
                                 $parcours = $pparcours['0'] . "<br>" . $pparcours['1'];
+
                                 $nbre = 1;
                                 $idParcours_test = $placeClassement['idEpreuveParcours'];
                                 if (!in_array($placeClassement['dossard'], $tabdossard)) {
@@ -553,7 +591,7 @@ foreach ($lieux as $lieu) {
                                 else {
                                     $club = "" . $placeClassement['clubInternaute'] . "</br>" . $placeClassement['villeInternaute'] . "";
                                     $cat = "<span id='cat'>" . "&nbsp;&nbsp;<b>" . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - " . $placeClassement['categorie'] . "</b>&nbsp;&nbsp;(" . $placeClassement['dossard'] . ")</span>";
-                                    $nom = "<b>" . $placeClassement['prenomInternaute'] . "</span>&nbsp;<span id='prenom'>" . $placeClassement['nomInternaute'] . "</b></br>" . $cat . "</span>";
+                                    $nom = "<b>" . $placeClassement['prenomInternaute'] . "</span>&nbsp;<span id='prenom'>" . $placeClassement['nomInternaute'] . "</b></br>" . $cat . "</br>".$placeClassement["idInscriptionEpreuveInternaute"]."</span>";
                                 }
 
                                 $tempsParLecteur = getTempsPassageParLecteur($placeClassement['idInscriptionEpreuveInternaute'], $idEpreuve);
@@ -569,15 +607,19 @@ foreach ($lieux as $lieu) {
                                         "<td style='vertical-align:middle;color:black;font-size:17px;font-weight:normal;' title='" . $placeClassement['passage'] . "° passage'>" . $nom . "</th>
                                                           <td id='club'  style='vertical-align:middle;color:black;font-size:15px;font-weight:normal;' title='" . $placeClassement['passage'] . "° passage'>" . $club . "</th>";
 //                                                        <td id='nomParcours'" . "  title='" . $placeClassement['nomParcours'] . "' style='vertical-align:middle;color:#f50666;font-size:15px;font-weight:normal;'>" . $parcours . "</th>";
+                                $lieuIndex = 0;
                                 foreach ($TabTempsPassageLieu as $lieu => $tempsPassage) {
                                     if (isset($tempsPassage[$placeClassement['idInscription']])) {
                                         $horairePassage = date('H:i:s', strtotime($tempsPassage[$placeClassement['idInscription']]));
                                         $tempsPassageAffiche = calculTemps($tempsPassage[$placeClassement['idInscription']], $placeClassement['horaireDepart']);
-                                        echo "<td id='horaire' title='Le temps provisoire = heure de passage - heure départ théorique...' style='vertical-align:middle;color:black;font-size:18px;font-weight:normal;'>" . "<b>" . $horairePassage . "</b><i> (heure)</i></br><i>" . $tempsPassageAffiche . " (temps)</i>" . "</th>";
+                                        echo "<td id='horaire' data-lieuIndex='" . $lieuIndex . "' title='...' style='vertical-align:middle;'>" . "<b>" . $horairePassage . "</b><i> (heure)</i></br><i>" . $tempsPassageAffiche . " (temps)</i>" . "</td>";
                                     } else {
-                                        echo "<td id='horaire' title='Le temps provisoire = heure de passage - heure départ théorique...' style='vertical-align:middle;color:black;font-size:18px;font-weight:normal;'>-</th>";
+                                        echo "<td id='horaire' data-lieuIndex='" . $lieuIndex . "' title='...' style='vertical-align:middle;'>-</td>";
                                     }
+                                    $lieuIndex++;
                                 }
+
+
 
                                 echo "<td id='horaire' title='Le temps provisoire = heure de passage - heure départ théorique...' style='vertical-align:middle;color:black;font-size:18px;font-weight:normal;'>" . $affiche_temps . "</th>
                                                          ";
@@ -829,7 +871,28 @@ foreach ($lieux as $lieu) {
     function filtrerParParcours(idParcours) {
         currentParcours = idParcours === 0 ? '' : String(idParcours);
         appliquerFiltres();
+
+        var colonnesLieux = document.querySelectorAll("th[data-parcoursLieu]");
+
+        colonnesLieux.forEach(function(col) {
+            var parcoursLieu = col.getAttribute('data-parcoursLieu');
+
+            if (idParcours === 0) {
+                col.style.display = "";
+                var indexLieu = col.getAttribute('data-lieuIndex');
+                document.querySelectorAll("td[data-lieuIndex='" + indexLieu + "']").forEach(td => td.style.display = "");
+            } else if (parcoursLieu === String(idParcours)) {
+                col.style.display = "";
+                var indexLieu = col.getAttribute('data-lieuIndex');
+                document.querySelectorAll("td[data-lieuIndex='" + indexLieu + "']").forEach(td => td.style.display = "");
+            } else {
+                col.style.display = "none";
+                var indexLieu = col.getAttribute('data-lieuIndex');
+                document.querySelectorAll("td[data-lieuIndex='" + indexLieu + "']").forEach(td => td.style.display = "none");
+            }
+        });
     }
+
 
 
     function appliquerFiltres() {
