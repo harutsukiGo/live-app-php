@@ -10,7 +10,8 @@ require_once("includes/functions.php");
 //session_start();
 global $mysqli;
 
-function normaliserLieu($str) {
+function normaliserLieu($str)
+{
     $str = mb_strtolower($str, 'UTF-8');
     $accents = ['é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'à' => 'a', 'â' => 'a', 'ä' => 'a', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ô' => 'o', 'ö' => 'o', 'î' => 'i', 'ï' => 'i', 'ç' => 'c'];
     return trim(strtr($str, $accents));
@@ -295,18 +296,6 @@ $lieux = getLieu($idEpreuve);
 
 $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
-
-function calculerPredictionTemps($distance, $vitesse)
-{
-    return $distance / $vitesse;
-}
-
-function calculerVitesseMoyenneCoureur()
-{
-
-}
-
-
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -472,6 +461,8 @@ function calculerVitesseMoyenneCoureur()
             <button type="button" onclick="filtrerParSexe('M')">Hommes</button>
             <button type="button" onclick="filtrerParSexe('F')">Femmes</button>
             <button type="button" onclick="filtrerParSexe('x')">Non binaire</button>
+            <button type="button" onclick="togglePredictions()">Afficher/Masquer prédictions</button>
+
 
             <div class='row' stymle>
                 <div id='load_classement' class='col'>
@@ -496,6 +487,9 @@ function calculerVitesseMoyenneCoureur()
                                 }
                                 ?>
 
+                                <th scope="col" style="text-align: center">
+                                    Vitesse
+                                </th>
 
                                 <?php
                                 if ($admin)
@@ -533,7 +527,7 @@ function calculerVitesseMoyenneCoureur()
                                 //On scinde le nom du parcours
 
                                 $pparcours = explode("-", $placeClassement['nomParcours']);
-                                $parcours = $pparcours['0'] . "<br>" . $pparcours['1'];
+                                $parcours = $pparcours[0] . (isset($pparcours[1]) ? "<br>" . $pparcours[1] : "");
 
                                 $nbre = 1;
                                 $idParcours_test = $placeClassement['idEpreuveParcours'];
@@ -596,20 +590,43 @@ function calculerVitesseMoyenneCoureur()
                                 $idInscription = $placeClassement['idInscription'];
                                 $idParcoursCoureur = $placeClassement['idEpreuveParcours'];
 
+
+                                $tempsPassagesCoureur = array_filter($TabTempsPassageLieu, function ($row) use ($idInscription, $idParcoursCoureur) {
+                                    return (int)$row['idInscription'] == (int)$idInscription
+                                            && (int)$row['idParcours'] == (int)$idParcoursCoureur;
+                                });
+
+                                $dernierPassage = null;
+                                $distanceMax = 0;
+                                foreach ($tempsPassagesCoureur as $passage) {
+                                    if ((float)$passage['distance_depart'] > $distanceMax) {
+                                        $distanceMax = (float)$passage['distance_depart'];
+                                        $dernierPassage = $passage;
+                                    }
+                                }
+
+                                $vitesseMoyenne = null;
+                                if ($dernierPassage && $distanceMax > 0) {
+                                    $tempsEcoule = strtotime($dernierPassage['horaire']) - strtotime($horaireDepart);
+                                    if ($tempsEcoule > 0) {
+                                        $vitesseMoyenne = $distanceMax / ($tempsEcoule / 3600);
+                                    }
+                                }
+
+
                                 foreach ($lieux as $lieuIndex => $lieuInfo) {
                                     $nomLieu = $lieuInfo['lieu'];
                                     $lieuParcours = $lieuInfo['idParcours'];
+                                    $distanceLieu = (float)$lieuInfo['distance_depart'];
 
-                                    if ($lieuParcours != $idParcoursCoureur) {
-                                        echo "<td data-lieuIndex='" . $lieuParcours . "' style='vertical-align:middle; '>-</td>";
-                                        continue;
+                                    $tempsFiltre = [];
+                                    if ($lieuParcours == $idParcoursCoureur) {
+                                        $tempsFiltre = array_filter($TabTempsPassageLieu, function ($row) use ($idInscription, $nomLieu, $idParcoursCoureur) {
+                                            return (int)$row['idInscription'] == (int)$idInscription
+                                                    && normaliserLieu($row['lieu']) == normaliserLieu($nomLieu)
+                                                    && (int)$row['idParcours'] == (int)$idParcoursCoureur;
+                                        });
                                     }
-
-                                    $tempsFiltre = array_filter($TabTempsPassageLieu, function($row) use ($idInscription, $nomLieu, $idParcoursCoureur) {
-                                        return (int)$row['idInscription'] == (int)$idInscription
-                                                && normaliserLieu($row['lieu']) == normaliserLieu($nomLieu)
-                                                && (int)$row['idParcours'] == (int)$idParcoursCoureur;
-                                    });
 
                                     if (!empty($tempsFiltre)) {
                                         $tempsFound = array_values($tempsFiltre)[0];
@@ -617,12 +634,26 @@ function calculerVitesseMoyenneCoureur()
                                         $tempsPassageAffiche = calculTemps($tempsFound['horaire'], $horaireDepart);
                                         echo "<td id='horaire' data-lieuIndex='" . $lieuParcours . "' style='vertical-align:middle;'>" .
                                                 "<b>" . $horairePassage . "</b><i> (heure)</i></br><i>" . $tempsPassageAffiche . " (temps)</i></td>";
+
+                                    } else if ($vitesseMoyenne && $distanceLieu > $distanceMax) {
+                                        $tempsPreditSecondes = ($distanceLieu / $vitesseMoyenne) * 3600;
+                                        $horairePreditTimestamp = strtotime($horaireDepart) + (int)$tempsPreditSecondes;
+                                        $horairePreditAffiche = date('H:i:s', $horairePreditTimestamp);
+                                        $tempsPreditAffiche = gmdate('G:i:s', (int)$tempsPreditSecondes);
+
+                                        echo "<td id='horaire' data-lieuIndex='" . $lieuParcours . "' data-lieu='" . $nomLieu . "' data-predict='true' style='vertical-align:middle; color:#007FFF; font-style:italic;'>" .
+                                                "<b>~" . $horairePreditAffiche . "</b><i> (prédit)</i></br><i>~" . $tempsPreditAffiche . "</i></td>";
+
                                     } else {
                                         echo "<td id='horaire' data-lieuIndex='" . $lieuParcours . "' data-lieu='" . $nomLieu . "' style='vertical-align:middle;'>-</td>";
                                     }
                                 }
 
-
+                                if ($vitesseMoyenne) {
+                                    echo "<td style='vertical-align:middle; text-align:center;'><b>" . round($vitesseMoyenne, 2) . "</b> km/h</td>";
+                                } else {
+                                    echo "<td style='vertical-align:middle; text-align:center;'>-</td>";
+                                }
 
                                 if ($admin) {
                                     $query3 = "SELECT re.nomEpreuve, rep.nomParcours, rep.idEpreuveParcours, ept.idEpreuveParcoursTarif  ";
@@ -909,6 +940,25 @@ function calculerVitesseMoyenneCoureur()
             lignes[i].style.display = (passeSexe && passeParcours && passeRecherche) ? "" : "none";
         }
     }
+
+    var predictionsVisible = true;
+    function togglePredictions() {
+        var predictions = document.querySelectorAll("td[data-predict='true']");
+        predictions.forEach(function(td) {
+            if (predictionsVisible) {
+                td.setAttribute('data-original-content', td.innerHTML);
+                td.innerHTML = '-';
+                td.style.color = '';
+                td.style.fontStyle = '';
+            } else {
+                td.innerHTML = td.getAttribute('data-original-content');
+                td.style.color = '#007FFF';
+                td.style.fontStyle = 'italic';
+            }
+        });
+        predictionsVisible = !predictionsVisible;
+    }
+
 </script>
 </body>
 
