@@ -146,7 +146,7 @@ function getflag($pays)
     if ($row = $result->fetch_assoc()) {
         $pays = substr(strtoupper($row["PAYSNAME"]), 0, 3);
         $flag = "<img src='../images/flag/" . $row["PAYSCODE"] . ".png'>";
-        // $flag = $pays . "-<img src='../images/flag/" . $row["PAYSCODE"] . ".png'>";
+//         $flag = $pays . "-<img src='../images/flag/" . $row["PAYSCODE"] . ".png'>";
     } else {
 
         $flag = "<img src='../images/flag/fr.png'>";
@@ -224,7 +224,7 @@ function getLieu($idEpreuve)
     global $mysqli;
     $queryLecteurs = "SELECT id, LOWER(lieu) AS lieu, lieu AS lieu_original, distance_depart, idParcours, date_max
                   FROM live_reader
-                  WHERE idEpreuve = ?
+                  WHERE idEpreuve = ? AND clone=0
                   ORDER BY distance_depart";
 
     $stmt = $mysqli->prepare($queryLecteurs);
@@ -249,7 +249,7 @@ function getTempsPassageParLecteur($idInscription, $idEpreuve)
               WHERE liv.idInscription = ?
               AND cl.idEpreuve = ?
               AND cl.date_min < liv.horaire
-              AND cl.date_max > liv.horaire";
+              AND cl.date_max > liv.horaire ";
 
     $stmt = $mysqli->prepare($query);
     $stmt->bind_param("ii", $idInscription, $idEpreuve);
@@ -265,7 +265,7 @@ function getTempsPassageLieu($idEpreuve)
      FROM live_Horaire lh
      JOIN r_inscriptionepreuveinternaute iei ON iei.idInscriptionEpreuveInternaute = lh.idInscription
      INNER JOIN live_reader lr ON (LOWER(lr.lieu) = LOWER(lh.lieu) AND iei.idEpreuveParcours = lr.idParcours)
-     WHERE lr.idEpreuve = ? AND lr.date_min < lh.horaire AND lr.date_max > lh.horaire
+     WHERE lr.idEpreuve = ? AND lr.date_min < lh.horaire AND lr.date_max > lh.horaire AND lr.clone= 0
      ORDER BY lh.horaire DESC;";
 
     $stmt = $mysqli->prepare($query);
@@ -467,7 +467,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
             <ul class="nav nav-tabs">
                 <li class="nav-item">
-                    <a href="classementLieu.php?idEpreuve=<?php echo $idEpreuve ?>"
+                    <a href="classementLive.php?idEpreuve=<?php echo $idEpreuve ?>"
                        style="background: #e1e1e1; color: black">RÉSULTAT</a>
                 </li>
                 <li class="nav-item">
@@ -485,7 +485,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
             $listeParcours = getParcours($idEpreuve);
             $premierParcoursId = !empty($listeParcours) ? $listeParcours[0]['idEpreuveParcours'] : null;
             foreach ($listeParcours as $p) {
-                echo "<button type='button' class='btn btn-outline-secondary m-b-10 m-r-10' data-idEpreuveParcours='" . $p['idEpreuveParcours'] . "' onclick=\"filtrerParParcours('" . $p['idEpreuveParcours'] . "')\">" . $p['nomParcours'] . "</button>";
+                echo "<button type='button' class='btn btn-outline-secondary m-b-10 m-r-10' style='background:rgba(238,238,238,.3);' data-idEpreuveParcours='" . $p['idEpreuveParcours'] . "' onclick=\"filtrerParParcours('" . $p['idEpreuveParcours'] . "')\">" . $p['nomParcours'] . "</button>";
             }
             ?>
 
@@ -625,7 +625,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                                 } //on crée les variables ici pour l'affichage des solos
                                 else {
                                     $club = "" . $placeClassement['clubInternaute'] . "</br>" . $placeClassement['villeInternaute'] . "";
-                                    $cat = "<span id='cat'>" . "&nbsp;&nbsp;<b>" . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - " . $placeClassement['categorie'] . "</b>&nbsp;&nbsp;(" . $placeClassement['dossard'] . ")</span>";
+                                    $cat = "<span id='cat'>" . "&nbsp;&nbsp;<b>" .getflag($placeClassement['paysInternaute']) . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - " . $placeClassement['categorie'] . "</b>&nbsp;&nbsp;(" . $placeClassement['dossard'] . ")</span>";
                                     $nom = "<b>" . $placeClassement['prenomInternaute'] . "</span>&nbsp;<span id='prenom'>" . $placeClassement['nomInternaute'] . "</b></br>" . $cat . "</span>";
                                 }
 
@@ -736,8 +736,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                                 </br>
                                 <button type='button' name='button' style='color:black;' onclick='deleteCoureur(" . $placeClassement['idInscription'] . ");'>X</button><i> -  tous les temps</i>
                                 </br>
-                                <button type='button' name='button' style='color:orange; font-weight:bold;' onclick='marquerAbandon(" . $placeClassement['idInscription'] . ", " . $placeClassement['dossard'] . ");'>ABD</button><i> </i>
-                                </br>                                
+                                                              
                                 <!--<button type='button' class='btn btn-primary' data-toggle='modal' data-target='#exampleModal" . $placeClassement['id'] . "'>
                                     <i class='fa fa-pencil-square-o' aria-hidden='true'></i>
                                 </button>-->
@@ -1075,7 +1074,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
     document.addEventListener('DOMContentLoaded', function () {
         const btnParcours = document.querySelectorAll("[data-idEpreuveParcours]");
-        const btnCategories = document.querySelectorAll("[data-categorieFiltre]");
+        // const btnCategories = document.querySelectorAll("[data-categorieFiltre]");
 
         btnParcours.forEach(function (btn) {
             btn.addEventListener("click", function () {
