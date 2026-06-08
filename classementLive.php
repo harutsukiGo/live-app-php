@@ -114,6 +114,7 @@ function getClassementLieu($idEpreuve)
   AND cl.date_min < liv.horaire
   AND cl.date_max > liv.horaire
   AND liv.passage <= cl.nb_passage
+  AND cl.clone=0
   AND NOT EXISTS (
       SELECT * FROM live_Horaire abd
       WHERE abd.idInscription = liv.idInscription
@@ -122,8 +123,6 @@ function getClassementLieu($idEpreuve)
   )
   GROUP BY liv.idInscription
   ORDER BY distance DESC, horaire ASC';
-//    echo $query;
-//    exit();
 
     $stmt = $mysqli->prepare($query);
     $stmt->bind_param("i", $idEpreuve);
@@ -146,7 +145,7 @@ function getflag($pays)
     if ($row = $result->fetch_assoc()) {
         $pays = substr(strtoupper($row["PAYSNAME"]), 0, 3);
         $flag = "<img src='../images/flag/" . $row["PAYSCODE"] . ".png'>";
-//         $flag = $pays . "-<img src='../images/flag/" . $row["PAYSCODE"] . ".png'>";
+        // $flag = $pays . "-<img src='../images/flag/" . $row["PAYSCODE"] . ".png'>";
     } else {
 
         $flag = "<img src='../images/flag/fr.png'>";
@@ -186,8 +185,6 @@ function getInfosEpreuve($idEpreuve)
     $query = 'SELECT  nomEpreuve, dateEpreuve, ville
     FROM r_epreuve ep
     WHERE ep.idEpreuve = ?';
-    // echo $query ;
-    // exit();
 
     $stmt = $mysqli->prepare($query);
     $stmt->bind_param("i", $idEpreuve);
@@ -228,8 +225,6 @@ function getLieu($idEpreuve)
                   ORDER BY distance_depart";
 
     $stmt = $mysqli->prepare($queryLecteurs);
-//    echo $queryLecteurs;
-//    exit();
     $stmt->bind_param("i", $idEpreuve);
     $stmt->execute();
     $lecteurs = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -249,7 +244,7 @@ function getTempsPassageParLecteur($idInscription, $idEpreuve)
               WHERE liv.idInscription = ?
               AND cl.idEpreuve = ?
               AND cl.date_min < liv.horaire
-              AND cl.date_max > liv.horaire ";
+              AND cl.date_max > liv.horaire";
 
     $stmt = $mysqli->prepare($query);
     $stmt->bind_param("ii", $idInscription, $idEpreuve);
@@ -261,11 +256,11 @@ function getTempsPassageLieu($idEpreuve)
 {
     global $mysqli;
 
-    $query = "SELECT lh.horaire, lh.idInscription, LOWER(lh.lieu) AS lieu, lr.distance_depart, lr.idParcours,lr.coefficient
+    $query = "SELECT lr.id,lh.horaire, lh.idInscription, LOWER(lh.lieu) AS lieu, lr.distance_depart, lr.idParcours,lr.coefficient
      FROM live_Horaire lh
      JOIN r_inscriptionepreuveinternaute iei ON iei.idInscriptionEpreuveInternaute = lh.idInscription
      INNER JOIN live_reader lr ON (LOWER(lr.lieu) = LOWER(lh.lieu) AND iei.idEpreuveParcours = lr.idParcours)
-     WHERE lr.idEpreuve = ? AND lr.date_min < lh.horaire AND lr.date_max > lh.horaire AND lr.clone= 0
+     WHERE lr.idEpreuve = ? AND lr.date_min < lh.horaire AND lr.date_max > lh.horaire AND lr.clone=0
      ORDER BY lh.horaire DESC;";
 
     $stmt = $mysqli->prepare($query);
@@ -278,28 +273,9 @@ function getTempsPassageLieu($idEpreuve)
 }
 
 
-function getCategorie($idEpreuve)
-{
-    global $mysqli;
-
-    $query = "SELECT ri.categorie
-  FROM r_inscriptionepreuveinternaute ri
-  INNER JOIN r_internaute rie ON rie.idInternaute = ri.idInternaute
-  WHERE ri.idEpreuve = ?
-  GROUP BY ri.categorie;";
-
-    $stmt = $mysqli->prepare($query);
-    $stmt->bind_param("i", $idEpreuve);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $results = mysqli_fetch_all($result, MYSQLI_ASSOC);
-
-    return $results;
-}
-
 $lieux = getLieu($idEpreuve);
-
 $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
+
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -315,17 +291,16 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
     <!-- ================== BEGIN BASE CSS STYLE ================== -->
     <!-- <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" rel="stylesheet" /> -->
 
-    <link href="assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet"/>
-    <link href="assets/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet"/>
-    <link href="assets/css/animate.min.css" rel="stylesheet"/>
-    <link href="assets/css/style_c.css" rel="stylesheet"/>
-    <link href="assets/css/theme/blue.css" id="theme" rel="stylesheet"/>
-    <link href="assets/plugins/bootstrap-timepicker/css/bootstrap-timepicker.min.css" rel="stylesheet"/>
-    <link href="assets/css/classementLive.css" rel="stylesheet"/>
-
-    <script src="../assets/plugins/jquery/jquery-1.9.1.min.js"></script>
-    <script src="../assets/plugins/jquery/jquery-migrate-1.1.0.min.js"></script>
-    <script src="../assets/plugins/jquery-ui/ui/minified/jquery-ui.min.js"></script>
+    <link href="assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="assets/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet" />
+    <link href="assets/css/animate.min.css" rel="stylesheet" />
+    <link href="assets/css/style_c.css" rel="stylesheet" />
+    <link href="assets/css/theme/blue.css" id="theme" rel="stylesheet" />
+    <link href="assets/plugins/bootstrap-timepicker/css/bootstrap-timepicker.min.css" rel="stylesheet" />
+    <link href="assets/css/classementLive.css" rel="stylesheet" />
+    <script src="assets/plugins/jquery/jquery-1.9.1.min.js"></script>
+    <script src="assets/plugins/jquery/jquery-migrate-1.1.0.min.js"></script>
+    <script src="assets/plugins/jquery-ui/ui/minified/jquery-ui.min.js"></script>
     <script>
         // fonctions jQuery ajax qui appelle le script majClassementLieu pour mettre à jour le classement du lieu toutes les 5 secondes
         // $(document).ready(function () {
@@ -373,14 +348,6 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 <div id="page-container" style="background:rgb(225, 225, 225)">
     <?php include('header.php'); ?>
 
-    <!--         <ul class="nav nav-tabs" style="margin-top:69px;background: #f3f3f3; font-size: 20px; font-weight: 400; ">-->
-    <!--            <li role="presentation" class="active"><a href="classementLieu.php?idEpreuve=-->
-    <?php //echo $idEpreuve ?><!--" style="background: #e1e1e1; color: black">RÉSULTAT</a></li>-->
-    <!--            <li role="presentation" class="active"><a href="classementListeEngage.php?idEpreuve=-->
-    <?php //echo $idEpreuve ?><!--" style="background: #e1e1e1; color: black">ENGAGÉS</a></li>-->
-    <!--            <li role="presentation" class="active"><a href="classementOrganisateur.php?idEpreuve=-->
-    <?php //echo $idEpreuve ?><!--" style="background: #e1e1e1; color: black">TABLEAU DE BOARD</a></li>-->
-    <!--        </ul>-->
 
 
     <div style="margin-top:10px;"></div>
@@ -390,7 +357,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
             <div class="content-title" style="display : flex; flex-direction: column; justify-content : center;">
                 <div>
                     <p class="btn btn-inverse"
-                       style="background:#444444;font-weight: 500;"><?php echo $infos_epreuve['nomEpreuve'] . " - " . date('d/m/Y', strtotime($infos_epreuve['dateEpreuve'])) ?></br>
+                       style="background:#444444;font-weight: 500;  white-space: normal;  word-wrap: break-word;"><?php echo $infos_epreuve['nomEpreuve'] . " - " . date('d/m/Y', strtotime($infos_epreuve['dateEpreuve'])) ?></br>
                     </p>
                 </div>
             </div>
@@ -405,10 +372,6 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                     </p>
                 </div> -->
                 <div id=nb_coureurs></div>
-                <!--                <div>-->
-                <!--                    <span style='color:#348fe2;font-size:23px;font-weight:normal;text-align:center;'><a-->
-                <!--                                href="liveinsport.php?idEpreuve=--><?php //echo $idEpreuve ?><!--"> Revenir à l'accueil</a></span>-->
-                <!--                </div>-->
 
                 <div class="input-group input-group-lg">
                     <input class="zoneSaisie" style="width: 70%; height:40px;text-align: center;" type="text"
@@ -479,27 +442,72 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                 .dashed {
                     border-bottom: 3px dashed;
                 }
+
+                 #tableau {
+                    font-size: 14px;
+                }
+
+                #tableau th, #tableau td {
+                    padding: 8px 6px;
+                    white-space: nowrap;
+                 }
+
+
+                 @media (max-width: 992px) {
+                    #tableau {
+                        font-size: 13px;
+                    }
+                    #tableau th, #tableau td {
+                        padding: 6px 4px;
+                    }
+                     #tableau th:nth-child(3),
+                    #tableau td:nth-child(3) {
+                        display: none;
+                    }
+                }
+
+                 @media (max-width: 576px) {
+                    #tableau {
+                        font-size: 12px;
+                    }
+                    #tableau th, #tableau td {
+                        padding: 5px 3px;
+                    }
+                     #tableau th:last-child,
+                    #tableau td:last-child {
+                        display: none;
+                    }
+                     #tableau td:nth-child(2) {
+                        white-space: normal;
+                        word-wrap: break-word;
+                        min-width: 100px;
+                    }
+
+                     #tableau td b  {
+                         font-size: 10px;
+                         white-space: initial;
+                     }
+
+                     #tableau td span b  {
+                         display: none;
+
+                     }
+
+                     #tableau td span   {
+                         font-size: 10px;
+
+                     }
             </style>
 
             <?php
             $listeParcours = getParcours($idEpreuve);
-            $premierParcoursId = !empty($listeParcours) ? $listeParcours[0]['idEpreuveParcours'] : null;
+            $premierParcoursId = isset($_GET['parcours']) ? (int)$_GET['parcours'] : (!empty($listeParcours) ? $listeParcours[0]['idEpreuveParcours'] : null);
             foreach ($listeParcours as $p) {
-                echo "<button type='button' class='btn btn-outline-secondary m-b-10 m-r-10' style='background:rgba(238,238,238,.3);' data-idEpreuveParcours='" . $p['idEpreuveParcours'] . "' onclick=\"filtrerParParcours('" . $p['idEpreuveParcours'] . "')\">" . $p['nomParcours'] . "</button>";
+                $isActive = ($p['idEpreuveParcours'] == $premierParcoursId) ? 'dashed' : '';
+                echo "<a href='?idEpreuve=" . $idEpreuve . "&parcours=" . $p['idEpreuveParcours'] . "' class='btn btn-outline-secondary m-b-10 m-r-10 " . $isActive . "' style='background:rgba(238,238,238,.3); color:black;'>" . $p['nomParcours'] . "</a>";
             }
             ?>
 
-            <div class="w-100" role="group" aria-label="Filtres categorie">
-
-                <!--                --><?php
-                //
-                //                $listeCategorie = getCategorie($idEpreuve);
-                //                echo "<button type='button' class='btn btn-outline-secondary m-b-10 m-r-10'  data-categorieFiltre='0' onclick=\"filtrerParCategorie(0)\">Tous</button>";
-                //                foreach ($listeCategorie as $c) {
-                //                    echo "<button type='button' class='btn btn-outline-secondary m-b-10 m-r-10'  data-categorieFiltre='" . $c['categorie'] . "' onclick=\"filtrerParCategorie('" . $c['categorie'] . "')\">" . $c['categorie'] . "</button>";
-                //                }
-                //                ?>
-            </div>
 
             <div class="w-100 m-b-10" role="group" aria-label="Filtres sexe">
                 <button type="button" class="btn btn-secondary btn-sexe active" onclick="filtrerParSexe('', this)">
@@ -521,7 +529,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
             </div>
             <div class='row' style>
                 <div id='load_classement' class='col'>
-                    <div class="table-responsive-lg" style=" width: 100%; text-align:center;">
+                    <div class="table-responsive" style="width: 100%; text-align:center;">
                         <table class="table table-striped" id="tableau">
                             <thead class="bg-info">
                             <tr>
@@ -538,7 +546,11 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
                                 <?php
                                 foreach ($lieux as $lieu) {
-                                    echo "<th scope='col' style='text-align: center' data-parcoursLieu='" . $lieu['idParcours'] . "' data-lieuIndex='" . $lieu['idParcours'] . "'>" . $lieu['lieu_original'] . "<br/><small> " . $lieu['distance_depart'] . "km</small> </th>";
+                                    if ($lieu['idParcours'] != $premierParcoursId) {
+                                        continue;
+                                    }
+
+                                    echo "<th scope='col' style='text-align: center'>" . $lieu['lieu_original'] . "<br/><small> " . $lieu['distance_depart'] . "km</small> </th>";
                                 }
                                 ?>
 
@@ -579,6 +591,9 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
 
                             foreach ($classement as $placeClassement) {
+                                if ($premierParcoursId && $placeClassement['idEpreuveParcours'] != $premierParcoursId) {
+                                    continue;
+                                }
                                 //On scinde le nom du parcours
 
                                 $pparcours = explode("-", $placeClassement['nomParcours']);
@@ -626,15 +641,10 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                                 else {
                                     $club = "" . $placeClassement['clubInternaute'] . "</br>" . $placeClassement['villeInternaute'] . "";
                                     $cat = "<span id='cat'>" . "&nbsp;&nbsp;<b>" .getflag($placeClassement['paysInternaute']) . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - " . $placeClassement['categorie'] . "</b>&nbsp;&nbsp;(" . $placeClassement['dossard'] . ")</span>";
+
                                     $nom = "<b>" . $placeClassement['prenomInternaute'] . "</span>&nbsp;<span id='prenom'>" . $placeClassement['nomInternaute'] . "</b></br>" . $cat . "</span>";
                                 }
 
-                                $tempsParLecteur = getTempsPassageParLecteur($placeClassement['idInscriptionEpreuveInternaute'], $idEpreuve);
-                                $tempsParLecteurArray = array();
-
-                                foreach ($tempsParLecteur as $tempsData) {
-                                    $tempsParLecteurArray[$tempsData['idLecteur']] = $tempsData;
-                                }
                                 //Affichage normal
                                 $affiche_temps = "<b>" . $horaire . "</b><i> (heure)</i></br><i>" . $temps . " (temps)</i>";
 
@@ -673,13 +683,17 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                                 $vitesseMoyenne = null;
                                 if ($dernierPassage && $distanceMax > 0) {
                                     $tempsEcoule = strtotime($dernierPassage['horaire']) - strtotime($horaireDepart);
-                                    if ($tempsEcoule > 0) {
-                                        $coefficient = isset($dernierPassage['coefficient']) ? $dernierPassage['coefficient'] : 1;
-                                        $vitesseMoyenne = $distanceMax * $coefficient / ($tempsEcoule / 3600);
-                                    }
+//                                    if ($tempsEcoule > 0) {
+                                    $coefficient = isset($dernierPassage['coefficient']) ? $dernierPassage['coefficient'] : 1;
+                                    $vitesseMoyenne = $distanceMax * $coefficient / ($tempsEcoule / 3600);
+//                                    }
                                 }
 
                                 foreach ($lieux as $lieuIndex => $lieuInfo) {
+                                    if ($lieuInfo['idParcours'] != $premierParcoursId) {
+                                        continue;
+                                    }
+
                                     $nomLieu = $lieuInfo['lieu'];
                                     $lieuParcours = $lieuInfo['idParcours'];
                                     $distanceLieu = (float)$lieuInfo['distance_depart'];
@@ -697,7 +711,7 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                                         $tempsTrouvee = array_values($tempsFiltre)[0];
                                         $horairePassage = date('H:i:s', strtotime($tempsTrouvee['horaire']));
                                         $tempsPassageAffiche = calculTemps($tempsTrouvee['horaire'], $horaireDepart);
-                                        echo "<td id='horaire' data-lieuIndex='" . $lieuParcours . "' style='vertical-align:middle;'>" .
+                                        echo "<td style='vertical-align:middle;'>" .
                                                 "<b>" . $horairePassage . "</b><i> (heure)</i></br><i>" . $tempsPassageAffiche . " (temps)</i></td>";
 
                                     } else if ($vitesseMoyenne && $distanceLieu >= $distanceMax) {
@@ -706,11 +720,11 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                                         $horairePreditAffiche = date('H:i:s', $horairePreditTimestamp);
                                         $tempsPreditAffiche = gmdate('G:i:s', (int)$tempsPreditSecondes);
 
-                                        echo "<td id='horaire' data-lieuIndex='" . $lieuParcours . "' data-lieu='" . $nomLieu . "' data-predict='true' style='vertical-align:middle; color:#007FFF; font-style:italic;'>" .
+                                        echo "<td data-predict='true' style='vertical-align:middle; color:#007FFF; font-style:italic;'>" .
                                                 "<b>~" . $horairePreditAffiche . "</b><i> (prédit)</i></br><i>~" . $tempsPreditAffiche . "</i></td>";
 
                                     } else {
-                                        echo "<td id='horaire' data-lieuIndex='" . $lieuParcours . "' data-lieu='" . $nomLieu . "' style='vertical-align:middle; text-align:center;'>-</td>";
+                                        echo "<td style='vertical-align:middle; text-align:center;'>-</td>";
                                     }
                                 }
 
@@ -929,30 +943,6 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
 </script>
 <script>
-    function filtrer() {
-
-
-        var filtre, tableau, ligne, cellule, i, texte
-
-        filtre = document.getElementById("maRecherche").value.toUpperCase();
-        tableau = document.getElementById("tableau");
-        ligne = tableau.getElementsByTagName("tr");
-
-
-        for (i = 0; i < ligne.length; i++) {
-
-            cellule = ligne[i].getElementsByTagName("td")[1];
-            if (cellule) {
-                texte = cellule.innerText;
-                if (texte.toUpperCase().indexOf(filtre) > -1) {
-                    ligne[i].style.display = "";
-                } else {
-                    ligne[i].style.display = "none";
-                }
-            }
-        }
-    }
-
     let currentSexe = '';
     let currentParcours = '';
     let currentRecherche = '';
@@ -978,47 +968,9 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
     }
 
     function filtrerParParcours(idParcours) {
-        currentParcours = idParcours === 0 ? '' : String(idParcours);
-        appliquerFiltres();
-
-        var colonnesLieux = document.querySelectorAll("th[data-parcoursLieu]");
-
-        colonnesLieux.forEach(function (col) {
-            var parcoursLieu = col.getAttribute('data-parcoursLieu');
-
-            if (parcoursLieu === String(idParcours)) {
-                col.style.display = "";
-                var indexLieu = col.getAttribute('data-lieuIndex');
-                document.querySelectorAll("td[data-lieuIndex='" + indexLieu + "']").forEach(td => td.style.display = "");
-            } else {
-                col.style.display = "none";
-                var indexLieu = col.getAttribute('data-lieuIndex');
-                document.querySelectorAll("td[data-lieuIndex='" + indexLieu + "']").forEach(td => td.style.display = "none");
-            }
-        });
+        window.location.href = '?idEpreuve=<?php echo $idEpreuve; ?>&parcours=' + idParcours;
     }
 
-
-    // function filtrerParCategorie(categorie) {
-    //     currentCategorie = categorie;
-    //     appliquerFiltres();
-    //
-    //     var colonnesLieux = document.querySelectorAll("th[data-categorie]");
-    //     colonnesLieux.forEach(function (col) {
-    //         var parcoursCategorie = col.getAttribute('data-categorieFiltre');
-    //         var indexCategorie = col.getAttribute('data-categorieFiltre');
-    //
-    //         if (categorie === 0 || parcoursCategorie === String(categorie)) {
-    //             col.style.display = "";
-    //             document.querySelectorAll("td[data-categorieFiltre='" + indexCategorie + "']").forEach(td => td.style.display = "");
-    //         } else {
-    //             col.style.display = "none";
-    //             document.querySelectorAll("td[data-categorieFiltre='" + indexCategorie + "']").forEach(td => td.style.display = "none");
-    //         }
-    //     });
-    //
-    //
-    // }
 
 
     function appliquerFiltres() {
@@ -1074,7 +1026,6 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
     document.addEventListener('DOMContentLoaded', function () {
         const btnParcours = document.querySelectorAll("[data-idEpreuveParcours]");
-        // const btnCategories = document.querySelectorAll("[data-categorieFiltre]");
 
         btnParcours.forEach(function (btn) {
             btn.addEventListener("click", function () {
@@ -1085,20 +1036,8 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
             });
         });
 
-        // btnCategories.forEach(function (btn) {
-        //     btn.addEventListener("click", function () {
-        //         btnCategories.forEach(function (b) {
-        //             b.classList.remove("dashed");
-        //         });
-        //         this.classList.add("dashed");
-        //     });
-        // });
-
         var btnEstimation = document.querySelector('.btn-estimation');
         togglePredictions(btnEstimation);
-        <?php if ($premierParcoursId): ?>
-        filtrerParParcours('<?php echo $premierParcoursId; ?>');
-        <?php endif; ?>
     });
 
 </script>
