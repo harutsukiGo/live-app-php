@@ -164,6 +164,39 @@ function checkIfResultatExist($id_epreuve)
     else return false;
 }
 
+function getParcours($idEpreuve)
+{
+    global $mysqli;
+    $query = 'SELECT ep.nomParcours, ep.idEpreuveParcours, MAX(lr.distance_depart) AS distance_max
+    FROM r_epreuveparcours ep
+    JOIN live_reader lr ON lr.idParcours = ep.idEpreuveParcours AND lr.idEpreuve = ep.idEpreuve
+    WHERE ep.idEpreuve = ?
+    GROUP BY ep.idEpreuveParcours
+    ORDER BY distance_max ASC';
+
+    $stmt = $mysqli->prepare($query);
+    $stmt->bind_param("i", $idEpreuve);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $parcours = mysqli_fetch_all($result, MYSQLI_ASSOC);
+
+    return $parcours;
+}
+
+
+function getInfosEpreuve($idEpreuve)
+{
+    global $mysqli;
+    $query = 'SELECT nomEpreuve, dateEpreuve, ville FROM r_epreuve WHERE idEpreuve = ?';
+    $stmt = $mysqli->prepare($query);
+    $stmt->bind_param("i", $idEpreuve);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+$infos_epreuve = getInfosEpreuve($idEpreuve);
+$listeParcours = getParcours($idEpreuve);
+$premierParcoursId = isset($_GET['parcours']) ? (int)$_GET['parcours'] : (!empty($listeParcours) ? $listeParcours[0]['idEpreuveParcours'] : null);
 ?>
 
 <!DOCTYPE html>
@@ -210,6 +243,13 @@ function checkIfResultatExist($id_epreuve)
     <script src='assets/plugins/jquery-ui/ui/minified/jquery-ui.min.js'></script>
     <!--<script defer type='text/javascript' src='../assets/js/scriptCreation.js'></script>-->
     <!-- ================== END BASE JS ================== -->
+
+    <style>
+        #tableau_lieux td {
+            text-align: center;
+            vertical-align: middle;
+        }
+    </style>
 </head>
 
 <body data-spy='scroll' data-target='#header-navbar' data-offsuivreet='51' id='body_accueil'>
@@ -328,6 +368,16 @@ function checkIfResultatExist($id_epreuve)
                     </div>
                     <hr style='border: 2px solid black;width: 80%'>
                 </div>
+                <div class="d-flex justify-content-between">
+
+                    <a href="classementLive.php?idEpreuve=<?php echo $idEpreuve; ?>" class="btn btn-secondary">
+                        Retour au classement général
+                    </a>
+                    <a href="liveinsport.php?idEpreuve=<?php echo $idEpreuve; ?>" class="btn btn-secondary">
+                        Suivre plus de lieux
+                    </a>
+                    <a href="https://ats-sport.com/liste_des_inscrits.php?id_epreuve=<?php echo $idEpreuve; ?>&course=<?php echo strtolower($infos_epreuve['nomEpreuve']); ?>" class="btn btn-secondary">Liste des engagés</a>
+                </div>
                 <!--début tableau-->
                 <h4 class='text-center text-dark mb-3'>Retrouvez le live des différents points de contrôles</h4>
                 <div class="table-responsive">
@@ -348,15 +398,20 @@ function checkIfResultatExist($id_epreuve)
                         foreach ($lieuxEpreuve as $lieu) {
                             $infoLecteurEpreuve = recuperationHeureDebutFinLieu($idEpreuve, $lieu['lieu']);
                             $nbCoureurs = recuperationNbCoureurs($idEpreuve, $lieu['lieu']);
-                            $lienClassement = "classementLiveReader.php?idEpreuve=" . $idEpreuve . "&idReader=" . $lieu['id'];
+                            $lienClassement = "classementLiveReader.php?idEpreuve=" . $idEpreuve . "&idReader=" . $lieu['id'] ."&parcours=" . $premierParcoursId;
                             ?>
                             <tr>
-                                <td class="align-middle">
-                                    <a href="<?php echo $lienClassement; ?>"
-                                       class="btn-outline-secondary font-weight-bold">
-                                        <i class="fa fa-map-marker"></i>
-                                        <?php echo htmlspecialchars($lieu['lieu']); ?>
+                                <td class="align-middle" >
+                                    <a href="<?php echo $lienClassement; ?>" class="d-flex align-items-center text-dark" style="text-decoration: none;">
+                                        <i class="fa fa-map-marker text-danger" style="font-size: 1.2rem;"></i>
+                                        <div class="text-left" style="align-items: center">
+                                            <div class="text-muted font-weight-bold" style="font-size: 1.2rem; text-transform: uppercase;">Temps de passage pour</div>
+                                            <div class="font-weight-bold" style="font-size: 1.1rem; color: #348fe2;">
+                                                <?php echo htmlspecialchars($lieu['lieu']); ?>
+                                            </div>
+                                        </div>
                                     </a>
+
                                 </td>
                                 <td class="text-center align-middle d-none d-md-table-cell">
                                     <?php echo $infoLecteurEpreuve['premierPassage']; ?>
@@ -370,7 +425,7 @@ function checkIfResultatExist($id_epreuve)
                                         </span>
                                 </td>
                                 <td class="text-center align-middle">
-                                    <a href="<?php echo $lienClassement; ?>" class="btn btn-outline-primary btn-sm">
+                                    <a href='classementLive.php?idEpreuve=<?php echo  $idEpreuve ?>' class="btn btn-outline-primary btn-sm">
                                         VOIR
                                     </a>
                                 </td>

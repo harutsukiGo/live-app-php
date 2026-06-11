@@ -344,6 +344,10 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 </head>
 
 <body>
+<div id="loader-overlay" role="status" aria-live="polite">
+    <div class="spinner"></div>
+    <p>Chargement en cours...</p>
+</div>
 <input type="hidden" id="<?php echo $idEpreuve ?>">
 <div id="page-container" style="background:rgb(225, 225, 225)">
     <?php include('header.php'); ?>
@@ -443,60 +447,95 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
                     border-bottom: 3px dashed;
                 }
 
-                 #tableau {
+                #tableau {
                     font-size: 14px;
                 }
 
                 #tableau th, #tableau td {
                     padding: 8px 6px;
                     white-space: nowrap;
-                 }
+                }
+
+                #loader-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100vh;
+                    background-color: rgba(255, 255, 255, 0.85);
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 9999;
+                    transition: opacity 0.4s ease, visibility 0.4s ease;
+                }
+
+                .spinner {
+                    width: 50px;
+                    height: 50px;
+                    border: 5px solid #f3f3f3;
+                    border-top: 5px solid #3498db;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin-bottom: 15px;
+                }
+
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+
+                .loader-hidden {
+                    opacity: 0;
+                    visibility: hidden;
+                }
 
 
-                 @media (max-width: 992px) {
+                @media (max-width: 992px) {
                     #tableau {
                         font-size: 13px;
                     }
                     #tableau th, #tableau td {
                         padding: 6px 4px;
                     }
-                     #tableau th:nth-child(3),
+                    #tableau th:nth-child(3),
                     #tableau td:nth-child(3) {
                         display: none;
                     }
                 }
 
-                 @media (max-width: 576px) {
+                @media (max-width: 576px) {
                     #tableau {
                         font-size: 12px;
                     }
                     #tableau th, #tableau td {
                         padding: 5px 3px;
                     }
-                     #tableau th:last-child,
+                    #tableau th:last-child,
                     #tableau td:last-child {
                         display: none;
                     }
-                     #tableau td:nth-child(2) {
+                    #tableau td:nth-child(2) {
                         white-space: normal;
                         word-wrap: break-word;
                         min-width: 100px;
                     }
 
-                     #tableau td b  {
-                         font-size: 10px;
-                         white-space: initial;
-                     }
+                    #tableau td b  {
+                        font-size: 10px;
+                        white-space: initial;
+                    }
 
-                     #tableau td span b  {
-                         display: none;
+                    #tableau td span b  {
+                        display: none;
 
-                     }
+                    }
 
-                     #tableau td span   {
-                         font-size: 10px;
+                    #tableau td span   {
+                        font-size: 10px;
 
-                     }
+                    }
             </style>
 
             <?php
@@ -1038,6 +1077,16 @@ $TabTempsPassageLieu = getTempsPassageLieu($idEpreuve);
 
         var btnEstimation = document.querySelector('.btn-estimation');
         togglePredictions(btnEstimation);
+    });
+
+    window.addEventListener("load", () => {
+        const loader = document.getElementById("loader-overlay");
+
+        loader.classList.add("loader-hidden");
+
+        loader.addEventListener("transitionend", () => {
+            loader.remove();
+        });
     });
 
 </script>

@@ -257,8 +257,8 @@ function getStatusParCoureur($idEpreuve)
     foreach ($rows as $row) {
         if (!isset($statusIndex[$row['idInscription']])) {
             $statusIndex[$row['idInscription']] = [
-                'status' => $row['status'],
-                'horaire' => $row['horaire']
+                    'status' => $row['status'],
+                    'horaire' => $row['horaire']
             ];
         }
     }
@@ -269,7 +269,10 @@ function getStatus($idEpreuve)
 {
     global $mysqli;
 
-    $query = "SELECT DISTINCT status FROM live_Horaire WHERE idEpreuve = ?";
+    $query = "  SELECT DISTINCT status
+                FROM live_Horaire lh
+                 WHERE lh.idEpreuve = ?
+               ";
 
     $stmt = $mysqli->prepare($query);
     $stmt->bind_param("i", $idEpreuve);
@@ -280,14 +283,17 @@ function getStatus($idEpreuve)
     return $status;
 }
 
-function getNbStatus($idEpreuve,$status){
+function getNbStatus($idEpreuve, $status, $idEpreuveParcours)
+{
 
     global $mysqli;
-
-    $query = "SELECT COUNT(*) as nb FROM live_Horaire WHERE idEpreuve = ? AND status = ?";
+    $query = "SELECT COUNT(*) as nb 
+FROM live_Horaire lh 
+  JOIN r_inscriptionepreuveinternaute iei ON lh.idInscription = iei.idInscriptionEpreuveInternaute
+WHERE lh.idEpreuve = ? AND status = ? AND idParcours = ?;";
 
     $stmt = $mysqli->prepare($query);
-    $stmt->bind_param("is", $idEpreuve, $status);
+    $stmt->bind_param("isi", $idEpreuve, $status, $idEpreuveParcours);
     $stmt->execute();
     $result = $stmt->get_result();
     $nbStatus = mysqli_fetch_assoc($result);
@@ -295,6 +301,7 @@ function getNbStatus($idEpreuve,$status){
     return $nbStatus['nb'];
 
 }
+
 $classement = getClassementLieu($idEpreuve);
 $lieux = getLieu($idEpreuve);
 $statusParCoureur = getStatusParCoureur($idEpreuve);
@@ -306,11 +313,11 @@ foreach ($TabTempsPassageLieu as $p) {
     $key = $p['idInscription'] . '_' . $p['idParcours'];
     if (!isset($derniersLieux[$key]) || (float)$p['distance_depart'] > $derniersLieux[$key]['dist']) {
         $derniersLieux[$key] = [
-            'dist' => (float)$p['distance_depart'],
-            'lieu' => $p['lieu'],
-            'status' => $p['status'],
-            'horaire' => $p['horaire'],
-            'passage' => isset($p['passage']) ? (int)$p['passage'] : 1
+                'dist' => (float)$p['distance_depart'],
+                'lieu' => $p['lieu'],
+                'status' => $p['status'],
+                'horaire' => $p['horaire'],
+                'passage' => isset($p['passage']) ? (int)$p['passage'] : 1
         ];
     }
 }
@@ -321,6 +328,7 @@ $premierParcoursId = isset($_GET['parcours']) ? (int)$_GET['parcours'] : (!empty
 $nbArrive = 0;
 $nbEnCourse = 0;
 $nbInscrit = 0;
+$compteurStatus = [];
 
 foreach ($classement as $c) {
     if ($premierParcoursId && $c['idEpreuveParcours'] != $premierParcoursId) {
@@ -342,6 +350,13 @@ foreach ($classement as $c) {
     } elseif ($status == 'OK') {
         $nbEnCourse++;
     }
+
+    if ($status != 'OK' && $status != 'A' && $status != 'I') {
+        if (!isset($compteurStatus[$status])) {
+            $compteurStatus[$status] = 0;
+        }
+        $compteurStatus[$status]++;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -358,13 +373,13 @@ foreach ($classement as $c) {
     <!-- ================== BEGIN BASE CSS STYLE ================== -->
     <!-- <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" rel="stylesheet" /> -->
 
-    <link href="assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="assets/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet" />
-    <link href="assets/css/animate.min.css" rel="stylesheet" />
-    <link href="assets/css/style_c.css" rel="stylesheet" />
-    <link href="assets/css/theme/blue.css" id="theme" rel="stylesheet" />
-    <link href="assets/plugins/bootstrap-timepicker/css/bootstrap-timepicker.min.css" rel="stylesheet" />
-    <link href="assets/css/classementLive.css" rel="stylesheet" />
+    <link href="assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="assets/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet"/>
+    <link href="assets/css/animate.min.css" rel="stylesheet"/>
+    <link href="assets/css/style_c.css" rel="stylesheet"/>
+    <link href="assets/css/theme/blue.css" id="theme" rel="stylesheet"/>
+    <link href="assets/plugins/bootstrap-timepicker/css/bootstrap-timepicker.min.css" rel="stylesheet"/>
+    <link href="assets/css/classementLive.css" rel="stylesheet"/>
     <script src="assets/plugins/jquery/jquery-1.9.1.min.js"></script>
     <script src="assets/plugins/jquery/jquery-migrate-1.1.0.min.js"></script>
     <script src="assets/plugins/jquery-ui/ui/minified/jquery-ui.min.js"></script>
@@ -439,7 +454,7 @@ foreach ($classement as $c) {
 
 
                 <div class="input-group input-group-lg">
-                    <input class="zoneSaisie" style="width: 70%; height:40px;text-align: center;" type="text"
+                    <input class="zoneSaisie" style="width: 70%; height:40px;text-align: center;border-radius: 8px;border: none" type="text"
                            placeholder="Rechercher un nom, prénom ou n° de dossard..." id="maRecherche"
                            onKeyUp="filtrer()">
                 </div>
@@ -495,7 +510,7 @@ foreach ($classement as $c) {
 
             <ul class="nav nav-tabs">
                 <li class="nav-item">
-                    <a href="classementLive2.php?idEpreuve=<?php echo $idEpreuve ?>"
+                    <a href="classementLive.php?idEpreuve=<?php echo $idEpreuve ?>"
                        style="background: #e1e1e1; color: black">RÉSULTAT</a>
                 </li>
                 <li class="nav-item">
@@ -514,11 +529,11 @@ foreach ($classement as $c) {
                     ?>
 
 
-
                     <div class="w-100 m-b-10" role="group" aria-label="Filtres status">
 
                         <?php
                         $listeStatus = getStatus($idEpreuve);
+
                         echo "<button type='button' class='btn btn-outline-secondary m-b-10 m-r-10' data-nomStatus='0' onclick=\"filtrerParStatus('')\">Tous</button>";
 
                         if ($nbArrive > 0) {
@@ -532,18 +547,19 @@ foreach ($classement as $c) {
                         }
 
                         $nomsStatus = [
-                            'ABD' => 'Abandon',
-                            'NP' => 'Non partant',
-                            'I' => 'Inscrit',
-                            'A' => 'Arrivé',
-                            'R' => 'Retard',
-                            'TR' => 'Très en retard'
+                                'ABD' => 'Abandon',
+                                'NP' => 'Non partant',
+                                'I' => 'Inscrit',
+                                'A' => 'Arrivé',
+                                'R' => 'Retard',
+                                'TR' => 'Très en retard'
                         ];
+                        $statusAffiche = [];
 
                         foreach ($listeStatus as $s) {
                             if ($s['status'] != 'OK' && $s['status'] != 'A' && $s['status'] != 'I') {
                                 $nomComplet = isset($nomsStatus[$s['status']]) ? $nomsStatus[$s['status']] : $s['status'];
-                                $nbStatus = getNbStatus($idEpreuve, $s['status']);
+                                $nbStatus = isset($compteurStatus[$s['status']]) ? $compteurStatus[$s['status']] : 0;
                                 echo "<button type='button' id='btn-status-" . $s['status'] . "' class='btn btn-outline-secondary m-b-10 m-r-10' data-nomStatus='" . $s['status'] . "' data-count='" . $nbStatus . "' data-label='" . $nomComplet . "' onclick=\"filtrerParStatus('" . $s['status'] . "')\">" . $nomComplet . " (" . $nbStatus . ")</button>";
                             }
                         }
@@ -552,13 +568,14 @@ foreach ($classement as $c) {
 
                     </div>
                     <div class="w-100 m-b-10" role="group" aria-label="Filtres sexe">
-                        <button type="button" class="btn btn-secondary btn-sexe active" onclick="filtrerParSexe('', this)">
+                        <button type="button" class="btn btn-secondary btn-sexe active"
+                                onclick="filtrerParSexe('', this)">
                             Tous
                         </button>
                         <button type="button" class="btn btn-secondary btn-sexe" onclick="filtrerParSexe('M', this)"><i
-                                class="fa fa-male"></i></button>
+                                    class="fa fa-male"></i></button>
                         <button type="button" class="btn btn-secondary btn-sexe" onclick="filtrerParSexe('F', this)"><i
-                                class="fa fa-female"></i></button>
+                                    class="fa fa-female"></i></button>
                         <?php
                         if (in_array('', array_column($classement, 'sexeInternaute'))) {
                             echo "<button type='button' class='btn btn-secondary btn-sexe' onclick=\"filtrerParSexe('x', this)\">Autres</button>";
@@ -616,8 +633,6 @@ foreach ($classement as $c) {
                                         // }
 
 
-
-
                                         foreach ($classement as $placeClassement) {
                                             if ($premierParcoursId && $placeClassement['idEpreuveParcours'] != $premierParcoursId) {
                                                 continue;
@@ -659,7 +674,7 @@ foreach ($classement as $c) {
                                                 $nb_homme = 0;
                                                 while ($row = mysqli_fetch_assoc($result2)) {
                                                     $club .= (($i > 0) ? "</br>" : "");
-                                                    $club .= " <span ' style=" . (($row['sexeInternaute'] == "F") ? 'font-style:italic;' : '') . ">" . $row['prenomInternaute'] . " " . $row['nomInternaute'] . " - " . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - <i class='fa fa-phone-square' aria-hidden='true'></i>  ".$row['telephone']."</span>";
+                                                    $club .= " <span ' style=" . (($row['sexeInternaute'] == "F") ? 'font-style:italic;' : '') . ">" . $row['prenomInternaute'] . " " . $row['nomInternaute'] . " - " . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - <i class='fa fa-phone-square' aria-hidden='true'></i>  " . $row['telephone'] . "</span>";
                                                     if ($row['sexeInternaute'] == "F") $nb_femme = $nb_femme + 1;
                                                     if ($row['sexeInternaute'] == "M") $nb_homme = $nb_homme + 1;
                                                     $i++;
@@ -671,8 +686,8 @@ foreach ($classement as $c) {
                                             } //on crée les variables ici pour l'affichage des solos
                                             else {
                                                 $club = "" . $placeClassement['clubInternaute'] . " (" . $placeClassement['villeInternaute'] . ")";
-                                                $cat = "<span id='cat'>" . "&nbsp;&nbsp;<b>" . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - " . $placeClassement['categorie'] . "</br>".(($placeClassement['telephone']!='')? "<i class='fa fa-phone-square' aria-hidden='true'></i> ":"") .$placeClassement['telephone'] . " </span>";
-                                                $nom = "<b>" . $placeClassement['prenomInternaute'] . "</span>&nbsp;<span id='prenom'>" . $placeClassement['nomInternaute'] . $cat."</b>" . "</span>";
+                                                $cat = "<span id='cat'>" . "&nbsp;&nbsp;<b>" . (($placeClassement['sexeInternaute'] == "M") ? "<i class='fa fa-male' ;></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . " - " . $placeClassement['categorie'] . "</br>" . (($placeClassement['telephone'] != '') ? "<i class='fa fa-phone-square' aria-hidden='true'></i> " : "") . $placeClassement['telephone'] . " </span>";
+                                                $nom = "<b>" . $placeClassement['prenomInternaute'] . "</span>&nbsp;<span id='prenom'>" . $placeClassement['nomInternaute'] . $cat . "</b>" . "</span>";
                                             }
 
 //                                //Affichage normal
@@ -690,7 +705,7 @@ foreach ($classement as $c) {
 
                                             $tempsPassagesCoureur = array_filter($TabTempsPassageLieu, function ($row) use ($idInscription, $idParcoursCoureur) {
                                                 return (int)$row['idInscription'] == (int)$idInscription
-                                                    && (int)$row['idParcours'] == (int)$idParcoursCoureur;
+                                                        && (int)$row['idParcours'] == (int)$idParcoursCoureur;
                                             });
 
                                             $dernierPassage = null;
@@ -703,10 +718,10 @@ foreach ($classement as $c) {
                                             }
 
                                             $estArrive = ($status == 'A') || (
-                                                    $status != 'ABD' && $status != 'NP' &&
-                                                    $dernierPassage && isset($dernierPassage['lieu'])
-                                                    && strpos(normaliserLieu($dernierPassage['lieu']), 'arriv') !== false
-                                                );
+                                                            $status != 'ABD' && $status != 'NP' &&
+                                                            $dernierPassage && isset($dernierPassage['lieu'])
+                                                            && strpos(normaliserLieu($dernierPassage['lieu']), 'arriv') !== false
+                                                    );
                                             $estArriveTr = $estArrive ? 'true' : 'false';
 
                                             if ($passageCoureur > 1) {
@@ -891,7 +906,7 @@ foreach ($classement as $c) {
                             </div>
                             <?php if ($admin) {
                                 echo
-                                    '<div class="content col-md-12 col-sm-12 col-xs-12">                                    
+                                        '<div class="content col-md-12 col-sm-12 col-xs-12">                                    
                                             <input id="bouton-suppr" type="submit" class="btn btn-danger center-block"
                                             value="Supprimer tous les résultats" onclick="deleteAllCoureurs(' . $idLecteur . ',' . $idEpreuve . ')">                                      
                                 </div>';
@@ -1005,9 +1020,11 @@ foreach ($classement as $c) {
                     #tableau {
                         font-size: 13px;
                     }
+
                     #tableau th, #tableau td {
                         padding: 6px 4px;
                     }
+
                     #tableau th:nth-child(3),
                     #tableau td:nth-child(3) {
                         display: none;
@@ -1018,9 +1035,11 @@ foreach ($classement as $c) {
                     #tableau {
                         font-size: 12px;
                     }
+
                     #tableau th, #tableau td {
                         padding: 5px 3px;
                     }
+
                     #tableau td:nth-child(2) {
                         max-width: 120px;
                         overflow: hidden;
@@ -1033,11 +1052,11 @@ foreach ($classement as $c) {
 
                 function filtrerStatut() {
                     clearTimeout(timerFiltreStatut);
-                    timerFiltreStatut = setTimeout(function() {
+                    timerFiltreStatut = setTimeout(function () {
                         var filtre = document.getElementById("maRechercheStatut").value.toUpperCase();
                         var lignes = document.querySelectorAll("#modalModifierStatuts .form-check");
 
-                        lignes.forEach(function(ligne) {
+                        lignes.forEach(function (ligne) {
                             var texte = ligne.textContent.toUpperCase();
                             var dossard = ligne.getAttribute("data-dossard") || "";
                             ligne.style.display = (texte.indexOf(filtre) > -1 || dossard.indexOf(filtre) > -1) ? "" : "none";
@@ -1050,8 +1069,13 @@ foreach ($classement as $c) {
                     var statut = document.getElementById("coureur_status").value;
                     var ids = [];
 
-                    checkboxes.forEach(function(cb) {
-                        ids.push(cb.value);
+                    checkboxes.forEach(function (cb) {
+                        var valeurs = cb.value.split(',');
+                        valeurs.forEach(function(id) {
+                            if (id && ids.indexOf(id) === -1) {
+                                ids.push(id);
+                            }
+                        });
                     });
 
                     if (ids.length === 0) {
@@ -1059,7 +1083,7 @@ foreach ($classement as $c) {
                         return;
                     }
 
-                     $.ajax({
+                    $.ajax({
                         url: 'changerStatut.php',
                         method: 'POST',
                         data: {
@@ -1067,11 +1091,11 @@ foreach ($classement as $c) {
                             statut: statut,
                             idEpreuve: <?php echo $idEpreuve; ?>
                         },
-                        success: function(response) {
+                        success: function (response) {
                             alert("Statuts mis à jour !");
                             location.reload();
                         },
-                        error: function() {
+                        error: function () {
                             alert("Erreur lors de la mise à jour");
                         }
                     });
@@ -1110,7 +1134,7 @@ foreach ($classement as $c) {
                     currentStatus = status;
                     appliquerFiltres();
 
-                     document.querySelectorAll('[data-nomStatus]').forEach(function(b) {
+                    document.querySelectorAll('[data-nomStatus]').forEach(function (b) {
                         b.classList.remove('dashed');
                     });
                     if (status) {
@@ -1154,7 +1178,7 @@ foreach ($classement as $c) {
                             }
                         }
 
-                        lignes[i].style.display = (passeSexe && passeParcours && passeRecherche && passeCategorie && passeStatus ) ? "" : "none";
+                        lignes[i].style.display = (passeSexe && passeParcours && passeRecherche && passeCategorie && passeStatus) ? "" : "none";
                     }
 
                     mettreAJourComptages();
@@ -1172,6 +1196,10 @@ foreach ($classement as $c) {
                     for (var i = 0; i < lignes.length; i++) {
                         var parcoursLigne = lignes[i].getAttribute("data-parcours");
 
+                        if (!parcoursLigne) {
+                            continue;
+                        }
+
                         if (currentParcours && parcoursLigne !== currentParcours) {
                             continue;
                         }
@@ -1183,8 +1211,7 @@ foreach ($classement as $c) {
 
                         if (arriveLigne === 'true') {
                             comptages.arrive++;
-                        }
-                        else if (statusLigne === 'OK') {
+                        } else if (statusLigne === 'OK') {
                             comptages.encourse++;
                         }
 
@@ -1219,7 +1246,7 @@ foreach ($classement as $c) {
                     }
 
                     var allStatusBtns = document.querySelectorAll("[id^='btn-status-']");
-                    allStatusBtns.forEach(function(btn) {
+                    allStatusBtns.forEach(function (btn) {
                         var statusId = btn.id.replace('btn-status-', '');
                         if (!(statusId in statusComptages)) {
                             var label = btn.getAttribute('data-label') || statusId;
@@ -1254,55 +1281,97 @@ foreach ($classement as $c) {
 
             </script>
 
-<div class="modal fade" id="modalModifierStatuts" tabindex="-1" role="dialog" aria-labelledby="modalModifierStatutsTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalModifierStatutsTitle">Modifier les statuts</h5>
-            </div>
+            <div class="modal fade" id="modalModifierStatuts" tabindex="-1" role="dialog"
+                 aria-labelledby="modalModifierStatutsTitle" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modalModifierStatutsTitle">Modifier les statuts</h5>
+                        </div>
 
-            <div class="row p-3">
-                <div class="col-md-8">
-                    <input class="form-control" type="text" placeholder="Rechercher un nom, prénom ou n° de dossard..." id="maRechercheStatut" onKeyUp="filtrerStatut()">
-                </div>
-                <div class="col-md-4">
-                    <button type="button" class="btn btn-primary btn-block" onclick="sauvegarderStatuts()">Sauvegarder</button>
-                </div>
-            </div>
+                        <div class="row p-3">
+                            <div class="col-md-8">
+                                <input class="form-control" type="text"
+                                       placeholder="Rechercher un nom, prénom ou n° de dossard..."
+                                       id="maRechercheStatut" onKeyUp="filtrerStatut()">
+                            </div>
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-primary btn-block" onclick="sauvegarderStatuts()">
+                                    Sauvegarder
+                                </button>
+                            </div>
+                        </div>
 
-             <div class="row">
-                <div class="col-md-8">
-                    <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
-                        <?php
-                        foreach ($classement as $placeClassement) {
-                            echo "<div class='form-check' data-dossard='" . $placeClassement['dossard'] . "'>";
-                            echo "<input class='form-check-input' type='checkbox' value='" . $placeClassement['idInscriptionEpreuveInternaute'] . "' id='coureur" . $placeClassement['idInscriptionEpreuveInternaute'] . "'>";
-                            echo "<label class='form-check-label' for='coureur" . $placeClassement['idInscriptionEpreuveInternaute'] . "'>" . $placeClassement['dossard'] . " - " . $placeClassement['nomInternaute'] . " " . $placeClassement['prenomInternaute'] . "</label>";
-                            echo "</div>";
-                        }
-                        ?>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                                    <?php
+                                    $equipesAffichees = [];
+                                    foreach ($classement as $placeClassement) {
+                                        if ($premierParcoursId && $placeClassement['idEpreuveParcours'] != $premierParcoursId) {
+                                            continue;
+                                        }
+                                        if ($placeClassement['equipe'] != 'Aucune') {
+                                            if (in_array($placeClassement['equipe'], $equipesAffichees)) {
+                                                continue;
+                                            }
+                                            $equipesAffichees[] = $placeClassement['equipe'];
+
+                                            $qequipe = "SELECT iei.idInscriptionEpreuveInternaute, nomInternaute, prenomInternaute, sexeInternaute, paysInternaute, telephone FROM r_internaute ri
+                                                            INNER JOIN r_inscriptionepreuveinternaute iei ON ri.idInternaute = iei.idInternaute
+                                                              WHERE iei.equipe LIKE '" . addslashes($placeClassement['equipe']) . "' AND iei.idEpreuve = " . $idEpreuve . "";
+                                            $result2 = $mysqli->query($qequipe) or die("Sql error : " . mysqli_error($mysqli));
+                                            $i = 0;
+                                            $club = "";
+                                            $membresIds = [];
+                                            $nb_femme = 0;
+                                            $nb_homme = 0;
+                                            while ($row = mysqli_fetch_assoc($result2)) {
+                                                $membresIds[] = $row['idInscriptionEpreuveInternaute'];
+                                                $club .= (($i > 0) ? "</br>" : "");
+                                                $club .= " <span style=" . (($row['sexeInternaute'] == "F") ? "'font-style:italic;'" : "''") . ">" . $row['prenomInternaute'] . " " . $row['nomInternaute'] . " - " . (($row['sexeInternaute'] == "M") ? "<i class='fa fa-male'></i>" : "<i class='fa fa-female' style='color:#f50666;'></i>") . "</span>";
+                                                if ($row['sexeInternaute'] == "F") $nb_femme = $nb_femme + 1;
+                                                if ($row['sexeInternaute'] == "M") $nb_homme = $nb_homme + 1;
+                                                $i++;
+                                            }
+
+                                            $nom = "<b>Equipe " . $placeClassement['equipe'] . "</b></br>" . $nb_femme . " <i class='fa fa-female' style='color:#f50666;'></i> | " . $nb_homme . " <i class='fa fa-male'></i>  (" . $placeClassement['dossard'] . ")";
+
+                                            echo "<input class='form-check-input' type='checkbox' value='" . implode(',', $membresIds) . "' data-equipe='1' id='equipe" . $placeClassement['idInscriptionEpreuveInternaute'] . "'>";
+                                            echo "<div class='form-check' data-dossard='" . $placeClassement['dossard'] . "'>";
+                                            echo "<label class='form-check-label' for='equipe" . $placeClassement['idInscriptionEpreuveInternaute'] . "'>" . $nom . "</br><span style='font-size:12px;'>" . $club . "</span></label>";
+                                            echo "</div>";
+                                        } else {
+                                            echo "<div class='form-check' data-dossard='" . $placeClassement['dossard'] . "'>";
+                                            echo "<input class='form-check-input' type='checkbox' value='" . $placeClassement['idInscriptionEpreuveInternaute'] . "' id='coureur" . $placeClassement['idInscriptionEpreuveInternaute'] . "'>";
+                                            echo "<label class='form-check-label' for='coureur" . $placeClassement['idInscriptionEpreuveInternaute'] . "'>" . $placeClassement['dossard'] . " - " . $placeClassement['nomInternaute'] . " " . $placeClassement['prenomInternaute'] . "</label>";
+                                            echo "</div>";
+                                        }
+
+                                    }
+                                    ?>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3">
+                                    <label for="coureur_status"><strong>Statut à appliquer</strong></label>
+                                    <select class="form-control" id="coureur_status" name="coureur_status" required>
+                                        <option value="A">Arrivée</option>
+                                        <option value="ABD">Abandon</option>
+                                        <option value="NP">Non partant</option>
+                                        <option value="R">En retard</option>
+                                        <option value="I">Inscrit</option>
+                                        <option value="TR">Très en retard</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div class="p-3">
-                        <label for="coureur_status"><strong>Statut à appliquer</strong></label>
-                        <select class="form-control" id="coureur_status" name="coureur_status" required>
-                            <option value="A">Arrivée</option>
-                            <option value="ABD">Abandon</option>
-                            <option value="NP">Non partant</option>
-                            <option value="R">En retard</option>
-                            <option value="I">Inscrit</option>
-                            <option value="TR">Très en retard</option>
-                        </select>
-                    </div>
-                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 </body>
 
